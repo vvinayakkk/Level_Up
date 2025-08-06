@@ -1,0 +1,220 @@
+version: '3.8'
+
+services:
+  # Main Flask Backend Service (Server)
+  backend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: levelup-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    volumes:
+      - ./server:/app/server
+      - ./divide.py:/app/divide.py
+      - ./saved_threads:/app/saved_threads
+    networks:
+      - levelup-network
+    depends_on:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Anushka's Flask Backend Service
+  anushka-backend:
+    build:
+      context: .
+      dockerfile: anushka/Dockerfile
+    container_name: levelup-anushka-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    volumes:
+      - ./anushka:/app
+      - ./saved_threads:/app/saved_threads
+    networks:
+      - levelup-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Vinayak's Flask Backend Service (Call Management)
+  vinayak-backend:
+    build:
+      context: .
+      dockerfile: vinayak/Dockerfile
+    container_name: levelup-vinayak-backend
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - BLAND_API_KEY=${BLAND_API_KEY}
+    volumes:
+      - ./vinayak:/app
+      - ./saved_threads:/app/saved_threads
+    networks:
+      - levelup-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Harshit's Flask Backend Service (YouTube Analytics)
+  harshit-backend:
+    build:
+      context: .
+      dockerfile: harshit/Dockerfile
+    container_name: levelup-harshit-backend
+    ports:
+      - "5003:5003"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - GOOGLE_CLIENT_SECRET_FILE=client_secret.json
+    volumes:
+      - ./harshit:/app
+      - ./harshit/client_secret.json:/app/client_secret.json
+    networks:
+      - levelup-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # React Frontend Service
+  frontend:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: levelup-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+      - REACT_APP_ANUSHKA_API_URL=http://localhost:5001
+      - REACT_APP_VINAYAK_API_URL=http://localhost:5002
+      - REACT_APP_HARSHIT_API_URL=http://localhost:5003
+      - NODE_ENV=development
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+    networks:
+      - levelup-network
+    depends_on:
+      - backend
+      - anushka-backend
+      - vinayak-backend
+      - harshit-backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MySQL Database Service (Optional)
+  db:
+    image: mysql:8.0
+    container_name: levelup-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-levelup}
+      MYSQL_USER: ${MYSQL_USER:-levelup_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-levelup_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - levelup-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis Cache Service (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: levelup-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - levelup-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: levelup-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    networks:
+      - levelup-network
+    depends_on:
+      - frontend
+      - backend
+      - anushka-backend
+      - vinayak-backend
+      - harshit-backend
+    restart: unless-stopped
+
+# Named volumes for persistent data
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  levelup-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 
