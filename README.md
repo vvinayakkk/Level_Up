@@ -4,6 +4,9 @@
 
 **Level Up** is a comprehensive AI-powered platform designed to solve the challenges of creating engaging, viral social media content through advanced technology. Our platform addresses the pain points of content creators, marketers, and social media managers by providing intelligent content generation, analytics, and optimization tools.
 
+
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/9abd16da-578a-4340-bb7a-b2937344e89d" />
+
 ### 🎯 Problem Statement
 
 Creating viral social media content is a complex challenge that requires:
